@@ -333,38 +333,12 @@ class UserUtility extends AbstractUtility
      */
     public static function login(User $user, $storagePids = null)
     {
-        $tsfe = self::getTypoScriptFrontendController();
-        $tsfe->fe_user->checkPid = false;
-        $info = $tsfe->fe_user->getAuthInfoArray();
-
-        $cleanIntList = implode(',', GeneralUtility::intExplode(',', $storagePids));
-
-        $extraWhere = ' AND uid = ' . (int)$user->getUid();
-        if (!empty($storagePids)) {
-            $extraWhere = ' AND pid IN (' . $cleanIntList . ')';
-        }
-        $user = $tsfe->fe_user->fetchUserRecord($info['db_user'], $user->getUsername(), $extraWhere);
-        $tsfe->fe_user->createUserSession($user);
-        self::loginAlternative($tsfe);
-        $tsfe->fe_user->user = $tsfe->fe_user->fetchUserSession();
-        $tsfe->fe_user->setAndSaveSessionData('ses', true);
-    }
-
-    /**
-     * This is a dirty solution to get autologin to work see https://github.com/in2code-de/femanager/issues/27 for
-     * details on this issue
-     *
-     * @param TypoScriptFrontendController $tsfe
-     * @return void
-     */
-    protected static function loginAlternative(TypoScriptFrontendController $tsfe)
-    {
-        if (ConfigurationUtility::isSetCookieOnLoginActive()) {
-            $reflection = new \ReflectionClass($tsfe->fe_user);
-            $setSessionCookie = $reflection->getMethod('setSessionCookie');
-            $setSessionCookie->setAccessible(true);
-            $setSessionCookie->invoke($tsfe->fe_user);
-        }
+        // ensure a session cookie is set (in case there is no session yet)
+        $GLOBALS['TSFE']->fe_user->setAndSaveSessionData('dummy', true);
+        // create the session (destroys all existing session data in the session backend!)
+        $GLOBALS['TSFE']->fe_user->createUserSession(['uid' => (int)$user->getUid()]);
+        // write the session data again to the session backend; preserves what was there before!!
+        $GLOBALS['TSFE']->fe_user->setAndSaveSessionData('dummy', true);
     }
 
     /**
